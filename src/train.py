@@ -4,7 +4,7 @@ from models import create_ann_simple, create_ann_with_dropout
 from evaluation import evaluate_and_plot
 
 # --- PASO 1: Cargar los datos ---
-DATA_PATH = './data/Tank_combined_ready.csv'
+DATA_PATH = './data/Tank_combined_v1.csv'
 X_train, X_test, y_train, y_test = load_and_prepare_data(DATA_PATH)
 
 # --- PASO 2: Entrenar y Evaluar el primer modelo ---
