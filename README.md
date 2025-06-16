@@ -37,8 +37,8 @@ Sigue estos pasos para ejecutar el proyecto en tu máquina local.
 
 1.  **Clona el repositorio:**
     ```bash
-    git clone [LA_URL_DE_TU_REPOSITORIO_EN_GITHUB]
-    cd [NOMBRE_DE_LA_CARPETA_DEL_PROYECTO]
+    git clone https://github.com/FredyZarate11/ACUAPONIA_IA
+    cd ACUAPONIA_IA
     ```
 
 2.  **Crea y activa un entorno virtual:**
