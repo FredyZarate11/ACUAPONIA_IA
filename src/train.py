@@ -1,60 +1,129 @@
-# Importa las funciones de tus otros archivos
-import time
-from data_processing import load_and_prepare_data
-from evaluation import plot
-from models import ann_simple
-from sklearn.model_selection import train_test_split
+import keras
 import pandas as pd
+from sklearn.model_selection import train_test_split
+from data_processing import process_data
+from models import ann_simple
+from evaluation import calculate_metrics, plot_evaluation_results
+import tensorflow as tf
 import numpy as np
-from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+import random
+import os
 
-# --- PASO 1: Cargar los datos ---
+def set_global_seeds(seed_value=42):
+    """
+    Fija las semillas aleatorias para Python, NumPy y TensorFlow 
+    para garantizar la reproducibilidad.
+    """
+    os.environ['PYTHONHASHSEED'] = str(seed_value)
+    random.seed(seed_value)
+    np.random.seed(seed_value)
+    tf.random.set_seed(seed_value)
+
+
+# --- 1. CONFIGURACIÓN DEL EXPERIMENTO ---
 DATA_PATH = './data/Tank_combined_v3.csv'
-X, Y, scaler_X, scaler_Y, Y = load_and_prepare_data(DATA_PATH)
-X['Fish_Weight(g)'] = Y  # Aseguramos que Y esté en X para la consistencia
-X.to_csv('./data/processed_data.csv', index=False)  # Guardar los datos procesados
-# Dividir los datos en conjuntos de entrenamiento y prueba
-X_train, X_test, y_train, y_test = train_test_split(X.drop('Fish_Weight(g)', axis=1), Y, test_size=0.2, random_state=42)
+SEED = 42
+set_global_seeds(SEED) # Puedes usar el mismo valor de RANDOM_STATE
+TARGET_COLUMN = 'Fish_Weight(g)'
+DATE_COLUMN = 'Datetime'
+FEATURE_COLUMNS = [
+    'Temperature(C)', 
+    'Turbidity(NTU)', 
+    'Dissolved_Oxygen(g/ml)', 
+    'PH', 
+    'Ammonia(g/ml)', 
+    'Nitrate(g/ml)', 
+    'Population'
+]
+TEST_SIZE = 0.2
+RANDOM_STATE = SEED
+EPOCHS = 1000
+BATCH_SIZE = 32
 
-# --- PASO 2: Entrenar y Evaluar el primer modelo ---
-input_shape = X_train.shape[1]
-model_1 = ann_simple(input_shape)
-print("\n--- Entrenando Modelo 1: ANN Simple ---")
-print(f"Arquitectura del modelo:\n{model_1.summary()}")
-history_1 = model_1.fit(
-    X_train, y_train, 
-    epochs=200,
-    batch_size=32,
-    validation_split=0.2, 
-    verbose='1',
-    shuffle=True
+def main():
+    """Función principal para ejecutar el flujo de trabajo de ML."""
+    
+    # --- 2. PROCESAMIENTO DE DATOS ---
+    try:
+        processed_data = process_data(
+            file_path=DATA_PATH,
+            feature_cols=FEATURE_COLUMNS,
+            target_col=TARGET_COLUMN,
+            date_col=DATE_COLUMN
+        )
+    except (ValueError, FileNotFoundError) as e:
+        print(f"Error durante el preprocesamiento: {e}")
+        return
+
+    # Guardar datos procesados para análisis futuro (opcional)
+    pd.concat([processed_data['X_original'], processed_data['y_original']], axis=1).to_csv('./data/processed_data.csv', index=False)
+
+    # --- 3. DIVISIÓN DE DATOS ---
+    X_train, X_test, y_train, y_test = train_test_split(
+        processed_data['X_scaled'], 
+        processed_data['y_scaled'], 
+        test_size=TEST_SIZE,
+        random_state=RANDOM_STATE
+    )
+    
+    # --- 4. DEFINICIÓN Y ENTRENAMIENTO DEL MODELO ---
+    input_shape = X_train.shape[1]
+    model = ann_simple(input_shape)
+    
+    print("\n--- Entrenando Modelo: ANN Simple ---")
+    model.summary()
+    
+    # * Callbacks
+    # Early stopping para evitar sobreajuste (para cuando la validación no mejora)
+    early_stopping = keras.callbacks.EarlyStopping(
+        monitor='val_loss',
+        patience=15,
+        min_delta=1e-4, # type: ignore (0.0001 es un valor común para tolerancia)
+        verbose=1,
+        restore_best_weights=True
     )
 
-print("\n--- Evaluando Modelo ---")
-y_pred_scaled = model_1.predict(X_test, verbose='0')
 
-# Desnormalizar valores reales y predicciones
-y_test_original = scaler_Y.inverse_transform(y_test.to_numpy().reshape(-1, 1)).flatten()
-y_pred_original = scaler_Y.inverse_transform(y_pred_scaled).flatten()
 
-# --- PASO 6: Calcular métricas en escala original ---
-mse = mean_squared_error(y_test_original, y_pred_original)
-rmse = np.sqrt(mse)
-mae = mean_absolute_error(y_test_original, y_pred_original)
-r2 = r2_score(y_test_original, y_pred_original)
+    history = model.fit(
+        X_train, y_train,
+        batch_size=BATCH_SIZE,
+        epochs=EPOCHS,
+        validation_split=0.2,
+        verbose=2, # type: ignore
+        shuffle=True,
+        callbacks=[early_stopping]
+    )
 
-print(f"\n--- RESULTADOS EN ESCALA ORIGINAL ---")
-print(f"MSE (Error Cuadrático Medio): {mse:.4f}")
-print(f"RMSE (Raíz del Error Cuadrático): {rmse:.4f}")
-print(f"MAE (Error Absoluto Medio): {mae:.4f}")
-print(f"R² (Coeficiente de Determinación): {r2:.4f}")
-print(f"Error relativo promedio: {(mae/y_test_original.mean())*100:.2f}%")
+    # --- 5. EVALUACIÓN DEL MODELO ---
+    print("\n--- Evaluando el Modelo en el Conjunto de Prueba ---")
+    
+    # Predecir con datos normalizados
+    y_pred_scaled = model.predict(X_test, verbose='1')
+    
+    # Desnormalizar para interpretar resultados
+    scaler_Y = processed_data['scaler_Y']
+    y_test_original = scaler_Y.inverse_transform(y_test.reshape(-1, 1)).flatten()
+    y_pred_original = scaler_Y.inverse_transform(y_pred_scaled).flatten()
 
-print(f"\nRango de valores reales: {y_test_original.min():.2f} a {y_test_original.max():.2f}")
-print(f"Rango de predicciones: {y_pred_original.min():.2f} a {y_pred_original.max():.2f}")
+    # Calcular métricas
+    metrics = calculate_metrics(y_test_original, y_pred_original)
+    
+    # Imprimir resultados en consola
+    print("\n--- RESULTADOS EN ESCALA ORIGINAL ---")
+    for name, value in metrics.items():
+        print(f"{name}: {value:.4f}")
 
-plot(model_1, "ANN Simple", history_1, X_test, y_test, y_pred_original)
-time.sleep(2000)  # Pausa para evitar problemas de visualización
+    # --- 6. VISUALIZACIÓN DE RESULTADOS ---
+    plot_evaluation_results(
+        model_name="ANN Simple",
+        history=history,
+        y_test_original=y_test_original,
+        y_pred_original=y_pred_original,
+        metrics=metrics
+    )
 
-print("\nEntrenamiento y evaluación completados.")
-time.sleep(2000)  # Pausa para evitar problemas de visualización
+    print("\n--- Proceso de entrenamiento y evaluación completado. ---")
+
+if __name__ == "__main__":
+    main()

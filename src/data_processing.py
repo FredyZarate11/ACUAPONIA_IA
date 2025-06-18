@@ -1,129 +1,104 @@
+# data_processing.py
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.impute import SimpleImputer
 import os
 
-def load_and_prepare_data(file_path):
+def process_data(file_path: str, feature_cols: list, target_col: str, date_col: str = 'Datetime'):
     """
-    Carga, diagnostica, limpia, estandariza y divide los datos para el entrenamiento.
+    Carga, limpia, agrega y normaliza los datos de un archivo CSV para un modelo de ML.
+
+    Args:
+        file_path (str): Ruta al archivo CSV.
+        feature_cols (list): Lista de nombres de las columnas de características.
+        target_col (str): Nombre de la columna objetivo.
+        date_col (str): Nombre de la columna de fecha.
+
+    Returns:
+        dict: Un diccionario con los datos procesados y los scalers.
     """
     print(f"--- Iniciando preprocesamiento para {os.path.basename(file_path)} ---")
-    data = pd.read_csv(file_path)
     
-    # 1. Renombrar columna de fecha para consistencia
-    if 'created_at' in data.columns:
-        data.rename(columns={'created_at': 'Datetime'}, inplace=True)
-
-    if 'Datetime' not in data.columns:
-        raise ValueError(f"Error: No se encontró una columna de fecha ('Datetime' o 'created_at') en {file_path}")
-
-    # 2. ESTANDARIZACIÓN DE FECHAS A UTC
+    # 1. Carga de datos
     try:
-        data['Datetime'] = pd.to_datetime(data['Datetime'], utc=True)
-        
-    except Exception as e:
-        print(f"  -> ERROR al convertir fechas: {e}. Omitiendo este archivo.")
-        raise ValueError(f"Error al procesar el archivo {file_path}: {e}")
+        data = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Error: No se encontró el archivo en la ruta: {file_path}")
 
-    # 3. Verificar que existe la columna objetivo antes de continuar
-    if 'Fish_Weight(g)' not in data.columns:
-        raise ValueError(f"Error: No se encontró la columna objetivo 'Fish_Weight(g)' en {file_path}")
+    # Renombrar 'created_at' si existe
+    if 'created_at' in data.columns and date_col not in data.columns:
+        data = data.rename(columns={'created_at': date_col})
 
-    # 4. Limpieza de columnas numéricas
-    features = ['Temperature(C)', 'Turbidity(NTU)', 'Dissolved_Oxygen(g/ml)', 'PH', 'Ammonia(g/ml)', 'Nitrate(g/ml)', 'Population', 'Dia_Cultivo']
-    # Lista real de columnas a procesar que existen en el dataframe
-    numeric_features_to_process = [col for col in features if col in data.columns and col != 'Dia_Cultivo']
+    if date_col not in data.columns:
+        raise ValueError(f"Error: La columna de fecha '{date_col}' no se encuentra en el archivo.")
 
-    for col in numeric_features_to_process:
+    # 2. Conversión y validación de columnas
+    data[date_col] = pd.to_datetime(data[date_col], utc=True, errors='coerce')
+    all_cols = feature_cols + [target_col]
+    
+    for col in all_cols:
+        if col not in data.columns:
+            print(f"Advertencia: La columna '{col}' no se encontró y será ignorada.")
+            continue
         data[col] = pd.to_numeric(data[col], errors='coerce')
+
+    # 3. Limpieza de datos (Infinitos y Nulos)
+    numeric_cols = [col for col in all_cols if col in data.columns and data[col].dtype in ['int64', 'float64']]
+    
+    for col in numeric_cols:
+        # Reemplazar infinitos con NaN para tratarlos de una sola vez
+        data[col] = data[col].replace([np.inf, -np.inf], np.nan)
         
-        # Manejo de valores infinitos usando mediana (más robusta contra outliers)
-        if np.isinf(data[col]).any():
-            # Calcular la mediana excluyendo infinitos y NaN
-            finite_values = data[col][np.isfinite(data[col])]
-            if len(finite_values) > 0:
-                median_value = finite_values.median()
-                mean_value = finite_values.mean()
-                inf_count = np.isinf(data[col]).sum()
-                print(f"  -> Reemplazando {inf_count} valores infinitos en '{col}' con mediana: {median_value:.4f} (promedio era: {mean_value:.4f})")
-                data[col] = data[col].replace([np.inf, -np.inf], median_value)
-            else:
-                print(f"  -> ADVERTENCIA: Columna '{col}' solo contiene infinitos/NaN. Se eliminarán estas filas.")
-        
-        # Interpolación para valores nulos
+        # Rellenar valores nulos con la mediana de la columna
         if data[col].isnull().any():
+            median_value = data[col].median()
             null_count = data[col].isnull().sum()
-            print(f"  -> Interpolando {null_count} valores nulos en '{col}'")
-            data[col] = data[col].interpolate(method='linear', limit_direction='both')
-        
-    # Eliminar filas donde las características principales aún sean nulas después de interpolar
-    data.dropna(subset=numeric_features_to_process, inplace=True)
+            print(f" -> Rellenando {null_count} valores nulos/infinitos en '{col}' con la mediana: {median_value:.4f}")
+            data[col] = data[col].fillna(median_value)
+
+    data = data.dropna(subset=[date_col] + numeric_cols)
     
-    # 5. Verificar que quedan datos después de la limpieza
     if data.empty:
-        raise ValueError(f"Error: No quedan datos después de la limpieza en {file_path}")
-    
-    # 6. Agregación diaria
-    data.set_index('Datetime', inplace=True)
-    # Incluir todas las columnas necesarias en el resample
-    columns_to_resample = numeric_features_to_process + ['Fish_Weight(g)']
-    df_daily = data[columns_to_resample].resample('D').mean()
-    
-    # Verificar y manejar infinitos después del resample usando mediana
-    for col in df_daily.columns:
-        if np.isinf(df_daily[col]).any():
-            finite_values = df_daily[col][np.isfinite(df_daily[col])]
-            if len(finite_values) > 0:
-                median_value = finite_values.median()
-                mean_value = finite_values.mean()
-                inf_count = np.isinf(df_daily[col]).sum()
-                print(f"  -> Reemplazando {inf_count} valores infinitos post-resample en '{col}' con mediana: {median_value:.4f} (promedio era: {mean_value:.4f})")
-                df_daily[col] = df_daily[col].replace([np.inf, -np.inf], median_value)
-                print(f"  -> Rango de valores finitos en '{col}': {finite_values.min():.4f} a {finite_values.max():.4f}")
-                print(f"  -> Percentiles: P25={finite_values.quantile(0.25):.4f}, P75={finite_values.quantile(0.75):.4f}")
-    
-    df_daily.dropna(inplace=True)
+        raise ValueError("No quedan datos después de la limpieza inicial.")
 
-   
+    # 4. Agregación diaria
+    data = data.set_index(date_col)
+    df_daily = data[numeric_cols].resample('D').mean()
+    df_daily = df_daily.dropna()  # Eliminar días sin datos después del resampleo
 
-    # 7. Verificar que quedan datos después del resample
     if df_daily.empty:
-        raise ValueError(f"Error: No quedan datos después de la agregación diaria en {file_path}")
+        raise ValueError("No quedan datos después de la agregación diaria.")
 
-    # 8. Ingeniería de Características
-    df_daily.reset_index(inplace=True)
-    start_date = df_daily['Datetime'].min()
-    df_daily['Dia_Cultivo'] = (df_daily['Datetime'] - start_date).dt.days
+    # 5. Ingeniería de Características
+    df_daily =df_daily.reset_index()
+    start_date = df_daily[date_col].min()
+    df_daily['Dia_Cultivo'] = (df_daily[date_col] - start_date).dt.days
     
-    # 9. Seleccionar características finales (ahora incluye Dia_Cultivo que se calculó)
-    final_features = [col for col in features if col in df_daily.columns]
-    
-    # 10. Verificar que tenemos características y variable objetivo
-    if not final_features:
-        raise ValueError(f"Error: No se encontraron características válidas en {file_path}")
-    
-    if 'Fish_Weight(g)' not in df_daily.columns:
-        raise ValueError(f"Error: La variable objetivo 'Fish_Weight(g)' no está disponible después del procesamiento en {file_path}")
-    
-    X = df_daily[final_features]
-    Y = df_daily['Fish_Weight(g)']
-    
-    print(f"  -> Características finales: {final_features}")
-    print(f"  -> Forma de X: {X.shape}, Forma de Y: {Y.shape}")
-    print(f"Procesamiento de {os.path.basename(file_path)} completado.")
+    # Asegurarnos de que 'Dia_Cultivo' esté en las características si no estaba antes
+    if 'Dia_Cultivo' not in feature_cols:
+        feature_cols.append('Dia_Cultivo')
+        
+    final_feature_cols = [col for col in feature_cols if col in df_daily.columns]
 
-    # 11. Normalización de datos
-    print(f"--- NORMALIZANDO DATOS ---")
+    # 6. Separación y Normalización
+    X = df_daily[final_feature_cols]
+    y = df_daily[target_col]
+
     scaler_X = StandardScaler()
     scaler_Y = StandardScaler()
+
     X_scaled = scaler_X.fit_transform(X)
+    y_scaled = scaler_Y.fit_transform(y.to_numpy().reshape(-1, 1)).flatten()
+
     X_scaled = pd.DataFrame(X_scaled, columns=X.columns)
 
-    Y_scaled = scaler_Y.fit_transform(Y.to_numpy().reshape(-1, 1)).flatten()
-
-    print(f"Rango original de Y: {Y.min():.2f} a {Y.max():.2f}")
-    print(f"Rango normalizado de Y: {Y_scaled.min():.2f} a {Y_scaled.max():.2f}")
-
-    return X_scaled, Y_scaled, scaler_X, scaler_Y, Y
+    print(f"--- Preprocesamiento completado. Forma de X: {X_scaled.shape}, Forma de y: {y_scaled.shape} ---")
+    
+    return {
+        'X_scaled': X_scaled,
+        'y_scaled': y_scaled,
+        'X_original': X,
+        'y_original': y,
+        'scaler_X': scaler_X,
+        'scaler_Y': scaler_Y,
+    }
