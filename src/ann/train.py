@@ -11,42 +11,48 @@ import tensorflow as tf
 import numpy as np
 import random
 import os
-
-def set_global_seeds(seed_value=42):
-    """Fija las semillas aleatorias para garantizar la reproducibilidad."""
-    os.environ['PYTHONHASHSEED'] = str(seed_value)
-    random.seed(seed_value)
-    np.random.seed(seed_value)
-    tf.random.set_seed(seed_value)
-
-# --- 1. CONFIGURACIÓN DEL EXPERIMENTO ---
-SEED_VALUE = 42
-set_global_seeds(SEED_VALUE)
+from config import *
 
 config = {
-    'DATA_PATH': './data/annData/Tank_combined_v3.csv',
-    'TARGET_COLUMN': 'Fish_Weight(g)',
-    'DATE_COLUMN': 'Datetime',
-    'FEATURE_COLUMNS': [
-        'Temperature(C)', 'Turbidity(NTU)', 'Dissolved_Oxygen(g/ml)', 
-        'PH', 'Ammonia(g/ml)', 'Nitrate(g/ml)', 'Population'
-    ],
-    'TEST_SIZE': 0.2,
-    'RANDOM_STATE': SEED_VALUE,
-    'EPOCHS': 1000,
-    'BATCH_SIZE': 32
+    'N_EXPERIMENTS': N_EXPERIMENTS,
+    'SEED': SEED,
+    'DATA_PATH': DATA_PATH,
+    'APPLY_CLEANING': APPLY_CLEANING,
+    'TARGET_COLUMN': TARGET_COLUMN,
+    'FEATURE_COLUMNS': FEATURE_COLUMNS,
+    'DATETIME_COLUMN': DATETIME_COLUMN,
+    'MODEL_TO_USE': MODEL_TO_USE,
+    'TEST_SIZE': TEST_SIZE,
+    'VALIDATION_SIZE': VALIDATION_SIZE,
+    'EPOCHS': EPOCHS,
+    'BATCH_SIZE': BATCH_SIZE,
+    'EARLY_STOPPING_PATIENCE': EARLY_STOPPING_PATIENCE,
+    'EARLY_STOPPING_DELTA': EARLY_STOPPING_DELTA
 }
+
+def set_global_seeds(config: dict):
+    if config['SEED'] is not None:
+        os.environ['PYTHONHASHSEED'] = str(config['SEED'])
+        random.seed(config['SEED'])
+        np.random.seed(config['SEED'])
+        tf.random.set_seed(config['SEED'])
+    else:
+        seed = random.randint(0, 10000)
+        os.environ['PYTHONHASHSEED'] = str(seed)
+        random.seed(seed)
+        np.random.seed(seed)
+        tf.random.set_seed(seed)
+        config['SEED'] = seed
 
 def main():
     """Función principal para ejecutar el flujo de trabajo de ML."""
     
-    # ... (El preprocesamiento y la división de datos no cambian) ...
     try:
         processed_data = process_data(
             file_path=config['DATA_PATH'],
             feature_cols=config['FEATURE_COLUMNS'],
             target_col=config['TARGET_COLUMN'],
-            date_col=config['DATE_COLUMN']
+            date_col=config['DATETIME_COLUMN']
         )
     except (ValueError, FileNotFoundError) as e:
         print(f"Error durante el preprocesamiento: {e}")
@@ -56,7 +62,7 @@ def main():
         processed_data['X_scaled'], 
         processed_data['y_scaled'], 
         test_size=config['TEST_SIZE'],
-        random_state=config['RANDOM_STATE']
+        random_state=config['SEED']
     )
     
     input_shape = X_train.shape[1]
@@ -66,36 +72,36 @@ def main():
     model.summary()
     
     early_stopping = keras.callbacks.EarlyStopping(
-        monitor='val_loss', patience=15, min_delta=1e-4, verbose=1, restore_best_weights=True
+        monitor='val_loss', patience=config['EARLY_STOPPING_PATIENCE'], min_delta=config['EARLY_STOPPING_DELTA'], verbose=1, restore_best_weights=True
     )
     
-    # --- MEDICIÓN DE TIEMPO: INICIO ---
+    # Time measurement for training
     start_time = time.time()
 
     history = model.fit(
         X_train, y_train,
         batch_size=config['BATCH_SIZE'],
         epochs=config['EPOCHS'],
-        validation_split=0.2,
+        validation_split=config['VALIDATION_SIZE'],
         verbose=2,
         shuffle=True,
         callbacks=[early_stopping]
     )
     
-    # --- MEDICIÓN DE TIEMPO: FIN ---
+    # Time ended
     end_time = time.time()
     training_duration = end_time - start_time
     
-    # Obtenemos el número real de épocas ejecutadas
     epochs_run = len(history.history['loss'])
 
-    # ... (La evaluación del modelo no cambia) ...
     print("\n--- Evaluando el Modelo en el Conjunto de Prueba ---")
     
     y_pred_scaled = model.predict(X_test, verbose=0)
     scaler_Y = processed_data['scaler_Y']
+
     y_test_original = scaler_Y.inverse_transform(y_test.reshape(-1, 1)).flatten()
     y_pred_original = scaler_Y.inverse_transform(y_pred_scaled).flatten()
+
     metrics = calculate_metrics(y_test_original, y_pred_original)
     
     print("\n--- RESULTADOS EN ESCALA ORIGINAL ---")
@@ -111,7 +117,7 @@ def main():
     report_path = os.path.join(report_folder, f'informe_{timestamp}.md')
     
     plot_evaluation_results(
-        model_name="ANN Simple",
+        model_name=config['MODEL_TO_USE'],
         history=history,
         y_test_original=y_test_original,
         y_pred_original=y_pred_original,

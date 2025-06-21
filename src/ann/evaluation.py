@@ -16,10 +16,8 @@ def calculate_metrics(y_true, y_pred) -> dict:
     metrics = { 'MSE': mse, 'RMSE': rmse, 'MAE': mae, 'R2': r2, 'Error Relativo (%)': relative_error }
     return metrics
 
-# La función plot_evaluation_results no cambia, solo la firma para aceptar save_path
+
 def plot_evaluation_results(model_name: str, history, y_test_original, y_pred_original, metrics: dict, save_path=None):
-    # ... (El código interno de la función es idéntico al anterior) ...
-    # ... por brevedad, no se repite aquí ...
     fig, axes = plt.subplots(2, 2, figsize=(16, 13))
     fig.suptitle(f'Evaluación del Modelo: {model_name}', fontsize=18, fontweight='bold')
 

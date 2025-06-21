@@ -24,14 +24,10 @@ def process_data(file_path: str, feature_cols: list, target_col: str, date_col: 
     except FileNotFoundError:
         raise FileNotFoundError(f"Error: No se encontró el archivo en la ruta: {file_path}")
 
-    # Renombrar 'created_at' si existe
-    if 'created_at' in data.columns and date_col not in data.columns:
-        data = data.rename(columns={'created_at': date_col})
-
     if date_col not in data.columns:
         raise ValueError(f"Error: La columna de fecha '{date_col}' no se encuentra en el archivo.")
 
-    # 2. Conversión y validación de columnas
+    # 2. Columns validations
     data[date_col] = pd.to_datetime(data[date_col], utc=True, errors='coerce')
     all_cols = feature_cols + [target_col]
     
@@ -41,14 +37,13 @@ def process_data(file_path: str, feature_cols: list, target_col: str, date_col: 
             continue
         data[col] = pd.to_numeric(data[col], errors='coerce')
 
-    # 3. Limpieza de datos (Infinitos y Nulos)
+    # 3. Data cleaning
     numeric_cols = [col for col in all_cols if col in data.columns and data[col].dtype in ['int64', 'float64']]
     
     for col in numeric_cols:
         # Reemplazar infinitos con NaN para tratarlos de una sola vez
         data[col] = data[col].replace([np.inf, -np.inf], np.nan)
         
-        # Rellenar valores nulos con la mediana de la columna
         if data[col].isnull().any():
             median_value = data[col].median()
             null_count = data[col].isnull().sum()
@@ -63,12 +58,12 @@ def process_data(file_path: str, feature_cols: list, target_col: str, date_col: 
     # 4. Agregación diaria
     data = data.set_index(date_col)
     df_daily = data[numeric_cols].resample('D').mean()
-    df_daily = df_daily.dropna()  # Eliminar días sin datos después del resampleo
+    df_daily = df_daily.dropna()  # drop any rows with NaN values after resampling
 
     if df_daily.empty:
         raise ValueError("No quedan datos después de la agregación diaria.")
 
-    # 5. Ingeniería de Características
+    # 5. days since start of cultivation
     df_daily =df_daily.reset_index()
     start_date = df_daily[date_col].min()
     df_daily['Dia_Cultivo'] = (df_daily[date_col] - start_date).dt.days
@@ -79,6 +74,7 @@ def process_data(file_path: str, feature_cols: list, target_col: str, date_col: 
         
     final_feature_cols = [col for col in feature_cols if col in df_daily.columns]
 
+    df_daily.to_csv(file_path.replace('.csv', '_processed.csv'), index=False)
     # 6. Separación y Normalización
     X = df_daily[final_feature_cols]
     y = df_daily[target_col]
