@@ -76,13 +76,13 @@ A continuación se resumen los resultados de los diferentes modelos probados. El
 
 | Modelo Probado | RMSE (g) | MAE (g) | MAPE (%) | Observaciones y Detalles |
 | :--- | :---: | :---: | :---: | :--- |
-| **ANN (Red Neuronal Artificial)** | *[resultado]* | *[resultado]* | *[Análisis del modelo...]* |
-| **DNN (Red Neuronal Profunda)** | *[resultado]* | *[resultado]* | *[Análisis del modelo...]* |
-| **KNN (K-Nearest Neighbors)** | *[resultado]* | *[resultado]* | *[Análisis del modelo...]* |
-| **RNN (Red Neuronal Recurrente)**| *[resultado]* | *[resultado]* | *[Análisis del modelo...]* |
-| **ANFIS** | *[resultado]* | *[resultado]* | *[Análisis del modelo...]* |
-| **SVR (Support Vector Regression)**| *[resultado]* | *[resultado]* | *[Análisis del modelo...]* |
-| **K-MEANS** | *[resultado]* | *[resultado]* | *[Análisis del modelo...]* |
+| **ANN (Red Neuronal Artificial)** | ** | ** | ** |
+| **DNN (Red Neuronal Profunda)** | ** | ** | ** |
+| **KNN (K-Nearest Neighbors)** |  ** | ** | ** |
+| **RNN (Red Neuronal Recurrente)**|  ** | ** | ** |
+| **ANFIS** |  ** | ** | ** |
+| **SVR (Support Vector Regression)**| ** | ** | ** |
+| **K-MEANS** |  ** | ** | ** |
 
 ### Conclusiones del Estudio
 
