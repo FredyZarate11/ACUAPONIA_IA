@@ -94,7 +94,7 @@ A continuación se resumen los resultados de los diferentes modelos probados. El
 
   * **Fredy Alejandro Zárate Abril**
   * **Email:** ing.fredyzarate@outlook.com
-  * **GitHub:** [@TuUsuarioDeGitHub](https://www.google.com/search?q=https://github.com/TuUsuarioDeGitHub) ---
+  * **GitHub:** [@FredyZarate11](https://github.com/FredyZarate11) ---
 
 ## 📄 Licencia
 
