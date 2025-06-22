@@ -6,7 +6,6 @@ import os
 import io
 from contextlib import redirect_stdout
 
-# La función calculate_metrics no cambia
 def calculate_metrics(y_true, y_pred) -> dict:
     mse = mean_squared_error(y_true, y_pred)
     rmse = np.sqrt(mse)
@@ -64,7 +63,6 @@ def plot_evaluation_results(model_name: str, history, y_test_original, y_pred_or
     plt.show()
 
 
-# NUEVO: La firma de la función ahora acepta `epochs_run` y `training_duration`
 def generate_report(model, model_name, metrics, config, image_path, report_path, epochs_run, training_duration):
     """Genera un informe de resultados en formato Markdown."""
     

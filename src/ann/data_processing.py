@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 import os
+import matplotlib.pyplot as plt
 
 def process_data(file_path: str, feature_cols: list, target_col: str, date_col: str = 'Datetime'):
     """
@@ -37,47 +38,9 @@ def process_data(file_path: str, feature_cols: list, target_col: str, date_col: 
             continue
         data[col] = pd.to_numeric(data[col], errors='coerce')
 
-    # 3. Data cleaning
-    numeric_cols = [col for col in all_cols if col in data.columns and data[col].dtype in ['int64', 'float64']]
-    
-    for col in numeric_cols:
-        # Reemplazar infinitos con NaN para tratarlos de una sola vez
-        data[col] = data[col].replace([np.inf, -np.inf], np.nan)
-        
-        if data[col].isnull().any():
-            median_value = data[col].median()
-            null_count = data[col].isnull().sum()
-            print(f" -> Rellenando {null_count} valores nulos/infinitos en '{col}' con la mediana: {median_value:.4f}")
-            data[col] = data[col].fillna(median_value)
 
-    data = data.dropna(subset=[date_col] + numeric_cols)
-    
-    if data.empty:
-        raise ValueError("No quedan datos después de la limpieza inicial.")
-
-    # 4. Agregación diaria
-    data = data.set_index(date_col)
-    df_daily = data[numeric_cols].resample('D').mean()
-    df_daily = df_daily.dropna()  # drop any rows with NaN values after resampling
-
-    if df_daily.empty:
-        raise ValueError("No quedan datos después de la agregación diaria.")
-
-    # 5. days since start of cultivation
-    df_daily =df_daily.reset_index()
-    start_date = df_daily[date_col].min()
-    df_daily['Dia_Cultivo'] = (df_daily[date_col] - start_date).dt.days
-    
-    # Asegurarnos de que 'Dia_Cultivo' esté en las características si no estaba antes
-    if 'Dia_Cultivo' not in feature_cols:
-        feature_cols.append('Dia_Cultivo')
-        
-    final_feature_cols = [col for col in feature_cols if col in df_daily.columns]
-
-    df_daily.to_csv(file_path.replace('.csv', '_processed.csv'), index=False)
-    # 6. Separación y Normalización
-    X = df_daily[final_feature_cols]
-    y = df_daily[target_col]
+    X = data[feature_cols]
+    y = data[target_col]
 
     scaler_X = StandardScaler()
     scaler_Y = StandardScaler()

@@ -46,7 +46,7 @@ def set_global_seeds(config: dict):
 
 def main():
     """Función principal para ejecutar el flujo de trabajo de ML."""
-    
+    set_global_seeds(config)
     try:
         processed_data = process_data(
             file_path=config['DATA_PATH'],
@@ -85,7 +85,7 @@ def main():
         validation_split=config['VALIDATION_SIZE'],
         verbose=2,
         shuffle=True,
-        callbacks=[early_stopping]
+        callbacks=[early_stopping, keras.callbacks.TerminateOnNaN() if config['SEED'] is not None else None]
     )
     
     # Time ended
@@ -112,7 +112,7 @@ def main():
     print("\n--- Generando informe de resultados ---")
     
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_folder = './results/ann_reports'
+    report_folder = './results/annResults'
     image_path = os.path.join(report_folder, f'grafico_{timestamp}.png')
     report_path = os.path.join(report_folder, f'informe_{timestamp}.md')
     
@@ -136,7 +136,7 @@ def main():
         epochs_run=epochs_run,
         training_duration=training_duration
     )
-
+    print("Semilla Usada:", config['SEED'])
     print("\n--- Proceso de entrenamiento y evaluación completado. ---")
 
 if __name__ == "__main__":
