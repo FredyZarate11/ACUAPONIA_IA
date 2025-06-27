@@ -74,15 +74,15 @@ El script cargará los datos, entrenará los modelos y generará las métricas d
 
 A continuación se resumen los resultados de los diferentes modelos probados. El objetivo era minimizar el error de predicción del peso de los peces.
 
-| Modelo Probado | RMSE (g) | MAE (g) | MAPE (%) | Observaciones y Detalles |
-| :--- | :---: | :---: | :---: | :--- |
-| **ANN (Red Neuronal Artificial)** | *[resultado]* | *[resultado]* | *[Análisis del modelo...]* |
-| **DNN (Red Neuronal Profunda)** | *[resultado]* | *[resultado]* | *[Análisis del modelo...]* |
-| **KNN (K-Nearest Neighbors)** | *[resultado]* | *[resultado]* | *[Análisis del modelo...]* |
-| **RNN (Red Neuronal Recurrente)**| *[resultado]* | *[resultado]* | *[Análisis del modelo...]* |
-| **ANFIS** | *[resultado]* | *[resultado]* | *[Análisis del modelo...]* |
-| **SVR (Support Vector Regression)**| *[resultado]* | *[resultado]* | *[Análisis del modelo...]* |
-| **K-MEANS** | *[resultado]* | *[resultado]* | *[Análisis del modelo...]* |
+| Modelo Probado | RMSE (g) | MAE (g) | $$R^{2}$$ | Error Relativo (%) | Observaciones y Detalles |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **ANN (Red Neuronal Artificial)** | 26.3791 | 19.4693 | 0.9589 | 10.0333 | El crecimiento no es lineal, por lo que no es bueno para predecir.
+| **DNN (Red Neuronal Profunda)** | ** | ** | ** | ** | 
+| **KNN (K-Nearest Neighbors)** |  ** | ** | ** | ** |
+| **RNN (Red Neuronal Recurrente)**|  ** |  ** | ** | ** |
+| **ANFIS** |  ** | ** | ** | ** |
+| **SVR (Support Vector Regression)**| ** | ** | ** | ** |
+| **K-MEANS** |  ** | ** | ** | ** |
 
 ### Conclusiones del Estudio
 
@@ -94,7 +94,7 @@ A continuación se resumen los resultados de los diferentes modelos probados. El
 
   * **Fredy Alejandro Zárate Abril**
   * **Email:** ing.fredyzarate@outlook.com
-  * **GitHub:** [@TuUsuarioDeGitHub](https://www.google.com/search?q=https://github.com/TuUsuarioDeGitHub) ---
+  * **GitHub:** [@FredyZarate11](https://github.com/FredyZarate11) ---
 
 ## 📄 Licencia
 
