@@ -11,6 +11,7 @@ def calculate_metrics(y_true, y_pred) -> dict:
     rmse = np.sqrt(mse)
     mae = mean_absolute_error(y_true, y_pred)
     r2 = r2_score(y_true, y_pred)
+    
     relative_error = (mae / np.mean(y_true)) * 100 if np.mean(y_true) != 0 else 0
     metrics = { 'MSE': mse, 'RMSE': rmse, 'MAE': mae, 'R2': r2, 'Error Relativo (%)': relative_error }
     return metrics
@@ -53,7 +54,7 @@ def plot_evaluation_results(model_name: str, history, y_test_original, y_pred_or
     axes[1, 1].set_title('Resumen de Métricas', fontsize=12)
     axes[1, 1].axis('off')
 
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.tight_layout(rect=(0, 0.03, 1, 0.95))
     
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -141,3 +142,38 @@ La siguiente imagen muestra las curvas de aprendizaje, la comparación entre val
         f.write(report_content)
     
     print(f"Informe de resultados guardado en: {report_path}")
+
+def evaluate_prediction(processed_data, dia_objetivo, predicted_weight_original, save_path=None):
+    print("\n--- Generando gráfico de validación de la curva de crecimiento ---")
+
+    X_original = processed_data['X_original']
+    y_original = processed_data['scaler_Y'].inverse_transform(processed_data['y_scaled'].reshape(-1, 1))
+
+    x = X_original['Dia_Cultivo'].values.flatten()
+    y_original = y_original.flatten()
+
+    # --- INICIO DE CÓDIGO AÑADIDO ---
+    # 1. Ajustar un modelo lineal (polinomio de grado 1)
+    # Esto nos da la pendiente (m) y la intercepción (b) de la mejor línea recta
+    m, b = np.polyfit(x, y_original, 1)
+    linea_dias_extendida = np.linspace(x.min(), dia_objetivo + 10, 300)
+    # --- FIN DE CÓDIGO AÑADIDO ---
+
+    plt.figure(figsize=(12, 7))
+    
+    plt.scatter(X_original['Dia_Cultivo'], y_original, label='Datos Históricos Reales', color='blue', alpha=0.5)
+    plt.scatter(dia_objetivo, predicted_weight_original, color='red', s=150, zorder=5, edgecolor='black', label=f'Predicción Futura (Día {dia_objetivo})')
+    
+    plt.plot(linea_dias_extendida, m*linea_dias_extendida + b, color='green', linestyle='--', linewidth=2, label='Tendencia Lineal')
+
+
+    plt.title('Curva de Crecimiento Histórica vs. Predicción Futura', fontsize=16)
+    plt.xlabel('Día de Cultivo', fontsize=12)
+    plt.ylabel('Peso del Pez (g)', fontsize=12)
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.6)
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path)
+        print(f"Gráfico de predicción guardado en: {save_path}")
+    plt.show()

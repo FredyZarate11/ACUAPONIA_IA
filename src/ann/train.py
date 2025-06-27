@@ -6,9 +6,10 @@ import time
 
 from data_processing import process_data
 from models import ann_simple
-from evaluation import calculate_metrics, plot_evaluation_results, generate_report
+from evaluation import calculate_metrics, plot_evaluation_results, generate_report, evaluate_prediction
 import tensorflow as tf
 import numpy as np
+from sklearn.linear_model import LinearRegression
 import random
 import os
 from config import *
@@ -125,7 +126,6 @@ def main():
         save_path=image_path
     )
 
-    # NUEVO: Se pasan la duración y las épocas al generador del informe
     generate_report(
         model=model,
         model_name="ANN Simple",
@@ -138,6 +138,59 @@ def main():
     )
     print("Semilla Usada:", config['SEED'])
     print("\n--- Proceso de entrenamiento y evaluación completado. ---")
+
+    print("\n\n--- Iniciando simulación de predicción a futuro ---")
+    
+    dias_a_predecir = int(input("Ingrese el número de días a predecir (ejemplo: 7): "))
+    clean_data = processed_data['X_original'].copy()
+
+    ultimo_dia_registrado = clean_data['Dia_Cultivo'].max()
+    dia_objetivo = ultimo_dia_registrado + dias_a_predecir
+    
+    print(f"Último día en el dataset: {ultimo_dia_registrado}. Prediciendo para el día: {dia_objetivo}.")
+
+    
+    # 2. Preparamos el diccionario que contendrá los datos futuros
+    future_values = {'Dia_Cultivo': dia_objetivo}
+    X_hist = clean_data[['Dia_Cultivo']] # El tiempo es nuestra característica
+
+    # 3. Iteramos sobre cada columna de característica para predecir su valor futuro
+    for col in config['FEATURE_COLUMNS']:
+        if col == 'Dia_Cultivo':
+            continue # Ya lo tenemos
+
+        if col == 'Population':
+            # La población la mantenemos constante al último valor conocido
+            last_population = clean_data.sort_values(by='Dia_Cultivo')['Population'].iloc[-1] # type: ignore
+            future_values[col] = last_population
+            continue
+        
+        # Entrenamos un modelo lineal simple para esta columna
+        y_hist = clean_data[col]
+        linear_model = LinearRegression()
+        linear_model.fit(X_hist, y_hist)
+        
+        # Predecimos el valor de esta variable para el día objetivo
+        predicted_val = linear_model.predict(np.array([[dia_objetivo]]))
+        future_values[col] = predicted_val[0]
+
+    future_data = pd.DataFrame([future_values])
+    future_data = future_data[config['FEATURE_COLUMNS']] # Asegurar orden
+
+    print("\nDatos de entrada (predichos por regresión lineal) para la predicción:")
+    print(future_data)
+    
+    future_data_scaled = processed_data['scaler_X'].transform(future_data)
+    
+    predicted_weight_scaled = model.predict(future_data_scaled)
+    
+    predicted_weight_original = scaler_Y.inverse_transform(predicted_weight_scaled)
+    
+    print("\n--- RESULTADO DE LA PREDICCIÓN ---")
+    print(f"El peso estimado del pez para el día {dia_objetivo} ({dias_a_predecir} días en el futuro) es: {predicted_weight_original[0][0]:.2f} gramos.")
+    print("------------------------------------")
+
+    evaluate_prediction(processed_data, dia_objetivo, predicted_weight_original, save_path=os.path.join(report_folder, f'grafico_Predicción{timestamp}.png'))
 
 if __name__ == "__main__":
     main()

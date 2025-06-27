@@ -16,9 +16,9 @@ FEATURE_COLUMNS = [
     'Nitrate(mg/L)', 
     'Dia_Cultivo',
     'Population',
-    'Fish_Length(cm)',
-    'Length_Squared',
-    'Length_Cubed'
+    # 'Fish_Length(cm)', 
+    # 'Length_Squared',
+    # 'Length_Cubed'
 ]
 DATETIME_COLUMN = 'Datetime'
 
