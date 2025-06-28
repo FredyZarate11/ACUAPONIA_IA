@@ -5,7 +5,7 @@ import datetime
 import time
 
 from data_processing import process_data
-from models import ann_simple
+from model import ann_simple
 from evaluation import calculate_metrics, plot_evaluation_results, generate_report, evaluate_prediction
 import tensorflow as tf
 import numpy as np

@@ -1,6 +1,6 @@
 # --- Configuración General del Experimento ---
 N_EXPERIMENTS = 1
-SEED = None      # None = random
+SEED = 42     # None = random
 
 # --- Dataset Configuration ---
 DATA_PATH = './data/annData/data.csv'
