@@ -84,7 +84,7 @@ def main():
         batch_size=config['BATCH_SIZE'],
         epochs=config['EPOCHS'],
         validation_split=config['VALIDATION_SIZE'],
-        verbose=2,
+        verbose=2, # type: ignore
         shuffle=True,
         callbacks=[early_stopping, keras.callbacks.TerminateOnNaN() if config['SEED'] is not None else None]
     )
@@ -97,7 +97,7 @@ def main():
 
     print("\n--- Evaluando el Modelo en el Conjunto de Prueba ---")
     
-    y_pred_scaled = model.predict(X_test, verbose=0)
+    y_pred_scaled = model.predict(X_test, verbose=0) # type: ignore
     scaler_Y = processed_data['scaler_Y']
 
     y_test_original = scaler_Y.inverse_transform(y_test.reshape(-1, 1)).flatten()

@@ -1,18 +1,20 @@
 # --- GENERAL ---
-N_EXPERIMENTS = 1
-SEED = 42  # None para una semilla aleatoria
+SEED = 42  # Semilla para reproducibilidad. None para aleatorio.
 
 # --- RUTAS DE ARCHIVOS ---
 RAW_DATA_PATH = './data/dnnData/data.csv'
-CLEANED_DATA_PATH = './data/dnn/dnnData/processed/data.csv'
+CLEANED_DATA_PATH = './data/dnnData/processed/data.csv'
+MODEL_SAVE_PATH = './models/dnn_model.keras'
 REPORT_FOLDER = './results/dnnResults'
 
-# --- CONFIGURACIÓN DE DATOS ---
-APPLY_CLEANING = True
-TARGET_COLUMN = 'Fish_Weight(g)'
-DATETIME_COLUMN = 'Datetime'
+# --- CONFIGURACIÓN DEL DATASET ---
+# Define los roles de las columnas de tu dataset.
+# El sistema usará estas listas para procesar cualquier archivo CSV.
 
-# Columnas que el modelo usará como características
+TARGET_COLUMN = 'Fish_Weight(g)'  # Columna que quieres predecir.
+
+# Columnas que se usarán como características de entrada para el modelo.
+# Si IS_TIME_SERIES es True, se generará 'Dia_Cultivo' y se añadirá aquí.
 FEATURE_COLUMNS = [
     'Temperature(C)',
     'Turbidity(NTU)',
@@ -20,14 +22,26 @@ FEATURE_COLUMNS = [
     'PH',
     'Ammonia(mg/L)',
     'Nitrate(mg/L)',
-    'Dia_Cultivo',
     'Population',
 ]
 
+# Columnas con texto que necesitan ser convertidas a números (ej: 'Bajo', 'Medio', 'Alto').
+# El sistema las convertirá a 0, 1, 2, etc.
+CATEGORICAL_COLUMNS = []
+
+# --- CONFIGURACIÓN DE PROCESAMIENTO ---
+# ¿Es tu dataset una serie temporal con una columna de fecha?
+IS_TIME_SERIES = True
+# Si es True, especifica el nombre de la columna de fecha.
+DATE_COLUMN = 'Datetime'
+# Día de cultivo mínimo para filtrar los datos (si es una serie temporal).
+# Útil para ignorar fases iniciales. Poner 0 o None para no filtrar.
+MIN_CULTIVATION_DAY = None
+
 # --- PARÁMETROS DE LIMPIEZA ---
-# Define los límites físicos o esperados para cada columna.
-# Formato: 'Nombre_Columna': (limite_inferior, limite_superior)
-# Usa `None` si no quieres aplicar un límite.
+# Define límites para eliminar valores atípicos.
+# Formato: 'Nombre_Columna': (limite_inferior, limite_superior).
+# Usa `None` si no quieres aplicar un límite en una dirección.
 CLEANING_BOUNDS = {
     'Temperature(C)': (-20, 40),
     'Turbidity(NTU)': (0, 100),
@@ -35,20 +49,17 @@ CLEANING_BOUNDS = {
     'PH': (0, 14),
     'Ammonia(mg/L)': (0, 7),
     'Nitrate(mg/L)': (0, 400),
-    'Fish_Weight(g)': (0, None), # El peso no puede ser negativo
-    'Fish_Length(cm)': (0, None) # La longitud no puede ser negativa
+    'Fish_Weight(g)': (0, None),
+    'Fish_Length(cm)': (0, None)
 }
 
-# --- PARÁMETROS DE PREPROCESAMIENTO ---
-# Filtrar datos para empezar desde un día de cultivo específico (p. ej., para usar solo la fase de crecimiento)
-# Poner 0 o None para no aplicar ningún filtro.
-MIN_CULTIVATION_DAY = None
-
 # --- CONFIGURACIÓN DEL MODELO Y ENTRENAMIENTO ---
-MODEL_TO_USE = 'DNN'
-TEST_SIZE = 0.2  # Usado para la prueba final del modelo
-VALIDATION_SIZE = 0.2  # Usado para la validación durante el entrenamiento
+MODEL_NAME = 'DNN_Generico'
+TEST_SIZE = 0.2  # Proporción para el conjunto de prueba.
+VALIDATION_SIZE = 0.2  # Proporción del set de entrenamiento para validación.
 EPOCHS = 300
 BATCH_SIZE = 32
-EARLY_STOPPING_PATIENCE = 15
+EARLY_STOPPING_PATIENCE = 15  # Épocas a esperar antes de detener el entrenamiento.
+EARLY_STOPPING_DELTA = 0.001 # Mejora mínima para considerar.
+_STOPPING_PATIENCE = 15
 EARLY_STOPPING_DELTA = 0.001

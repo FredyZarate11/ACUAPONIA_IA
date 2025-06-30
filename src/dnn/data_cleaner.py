@@ -1,71 +1,93 @@
-# data_cleaner.py
-
 import pandas as pd
 import numpy as np
 import os
+from config import (
+    RAW_DATA_PATH, CLEANED_DATA_PATH, DATE_COLUMN, IS_TIME_SERIES,
+    FEATURE_COLUMNS, TARGET_COLUMN, CATEGORICAL_COLUMNS, CLEANING_BOUNDS
+)
 
-def clean_dataset(raw_path: str,
-                  cleaned_path: str,
-                  datetime_col: str,
-                  columns_to_clean: list,
-                  cleaning_bounds: dict):
+def convert_categorical_to_numeric(data: pd.DataFrame, cat_columns: list) -> pd.DataFrame:
     """
-    Carga un dataset, lo limpia basándose en límites y lo guarda.
+    Convierte las columnas categóricas especificadas a valores numéricos usando pd.factorize.
+    """
+    for col in cat_columns:
+        if col in data.columns:
+            data[col], _ = pd.factorize(data[col])
+            print(f"Columna categórica '{col}' convertida a numérica.")
+    return data
 
-    Args:
-        raw_path (str): Ruta al archivo de datos crudos.
-        cleaned_path (str): Ruta donde se guardará el archivo limpio.
-        datetime_col (str): Nombre de la columna de fecha y hora.
-        columns_to_clean (list): Lista de columnas numéricas a limpiar.
-        cleaning_bounds (dict): Diccionario con los límites para cada columna.
+def clean_dataset():
     """
-    print(f"--- Iniciando limpieza de datos de: {raw_path} ---")
+    Carga un dataset, lo limpia basándose en la configuración y lo guarda.
+    Responsabilidades:
+    1. Cargar los datos crudos.
+    2. Convertir columnas categóricas a numéricas.
+    3. Manejar la columna de fecha/hora si aplica (IS_TIME_SERIES).
+    4. Limpiar valores atípicos y rellenar NaNs en columnas numéricas.
+    5. Guardar el dataset limpio.
+    """
+    print(f"--- Iniciando limpieza de datos de: {RAW_DATA_PATH} ---")
 
     try:
-        data = pd.read_csv(raw_path)
+        data = pd.read_csv(RAW_DATA_PATH)
     except FileNotFoundError:
-        print(f"Error: No se encontró el archivo en la ruta: {raw_path}")
+        print(f"Error: No se encontró el archivo en la ruta: {RAW_DATA_PATH}")
         return False
 
-    # 1. Manejo de la columna de fecha
-    data[datetime_col] = pd.to_datetime(data[datetime_col], errors='coerce')
-    data = data.dropna(subset=[datetime_col])
-    if data[datetime_col].dt.tz is None:
-        data[datetime_col] = data[datetime_col].dt.tz_localize('UTC')
-    else:
-        data[datetime_col] = data[datetime_col].dt.tz_convert('UTC')
+    # 1. Convertir columnas categóricas a numéricas
+    if CATEGORICAL_COLUMNS:
+        data = convert_categorical_to_numeric(data, CATEGORICAL_COLUMNS)
 
-    # 2. Limpieza de columnas numéricas
-    for col in columns_to_clean:
+    # 2. Manejo de la columna de fecha (si aplica)
+    if IS_TIME_SERIES and DATE_COLUMN in data.columns:
+        print(f"Procesando columna de fecha: {DATE_COLUMN}")
+        data[DATE_COLUMN] = pd.to_datetime(data[DATE_COLUMN], errors='coerce')
+        data = data.dropna(subset=[DATE_COLUMN])
+        if data[DATE_COLUMN].dt.tz is None:
+            data[DATE_COLUMN] = data[DATE_COLUMN].dt.tz_localize('UTC')
+        else:
+            data[DATE_COLUMN] = data[DATE_COLUMN].dt.tz_convert('UTC')
+    
+    # 3. Limpieza de columnas numéricas
+    # Incluye características, objetivo y cualquier otra columna definida en los límites.
+    columns_to_process = list(set(FEATURE_COLUMNS + [TARGET_COLUMN] + list(CLEANING_BOUNDS.keys())))
+
+    for col in columns_to_process:
         if col not in data.columns:
-            print(f"Advertencia: La columna '{col}' no se encontró en el dataset.")
+            # No es un error, puede que la columna solo esté en los bounds pero no en el dataset actual
             continue
 
-        data[col] = pd.to_numeric(data[col], errors='coerce')
-        data = data.replace([np.inf, -np.inf], np.nan)
+        # Asegurarse de que la columna es numérica antes de procesar
+        if pd.api.types.is_numeric_dtype(data[col]):
+            data[col] = pd.to_numeric(data[col], errors='coerce')
+            data = data.replace([np.inf, -np.inf], np.nan)
 
-        # Aplicar límites definidos en config
-        lower_bound, upper_bound = cleaning_bounds.get(col, (None, None))
-        if lower_bound is not None:
-            data.loc[data[col] < lower_bound, col] = np.nan
-        if upper_bound is not None:
-            data.loc[data[col] > upper_bound, col] = np.nan
+            # Aplicar límites definidos en config
+            lower_bound, upper_bound = CLEANING_BOUNDS.get(col, (None, None))
+            if lower_bound is not None:
+                data.loc[data[col] < lower_bound, col] = np.nan
+            if upper_bound is not None:
+                data.loc[data[col] > upper_bound, col] = np.nan
 
-        # Interpolar valores NaN y luego rellenar los restantes
-        data[col] = data[col].interpolate(method='linear')
-        data[col] = data[col].bfill()
-        data[col] = data[col].ffill()
+            # Interpolar valores NaN y luego rellenar los restantes
+            data[col] = data[col].interpolate(method='linear')
+            data[col] = data[col].bfill()
+            data[col] = data[col].ffill()
 
-    # 3. Eliminar filas donde la variable objetivo es nula (si existe)
-    if 'Fish_Weight(g)' in data.columns:
-        data = data.dropna(subset=['Fish_Weight(g)'])
+    # 4. Eliminar filas donde la variable objetivo sigue siendo nula
+    if TARGET_COLUMN in data.columns:
+        data = data.dropna(subset=[TARGET_COLUMN])
 
     print("--- Limpieza completada. ---")
 
-    # 4. Guardar el archivo limpio
-    output_dir = os.path.dirname(cleaned_path)
+    # 5. Guardar el archivo limpio
+    output_dir = os.path.dirname(CLEANED_DATA_PATH)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    data.to_csv(cleaned_path, index=False)
-    print(f"Dataset limpio guardado en: {cleaned_path}")
+    data.to_csv(CLEANED_DATA_PATH, index=False)
+    print(f"Dataset limpio guardado en: {CLEANED_DATA_PATH}")
     return True
+
+if __name__ == '__main__':
+    # Esto permite ejecutar el script de forma independiente para probar la limpieza
+    clean_dataset()
