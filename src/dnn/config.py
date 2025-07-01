@@ -2,10 +2,10 @@
 SEED = 42  # Semilla para reproducibilidad. None para aleatorio.
 
 # --- RUTAS DE ARCHIVOS ---
-RAW_DATA_PATH = './data/annData/data.csv'
-CLEANED_DATA_PATH = './data/annData/processed/data.csv'
-MODEL_SAVE_PATH = './models/ann_model.keras'
-REPORT_FOLDER = './results/annResults'
+RAW_DATA_PATH = './data/dnnData/data.csv'
+CLEANED_DATA_PATH = './data/dnnData/processed/data.csv'
+MODEL_SAVE_PATH = './models/dnn_model.keras'
+REPORT_FOLDER = './results/dnnResults'
 
 # --- CONFIGURACIÓN DEL DATASET ---
 # Define los roles de las columnas de tu dataset.
@@ -54,7 +54,7 @@ CLEANING_BOUNDS = {
 }
 
 # --- CONFIGURACIÓN DEL MODELO Y ENTRENAMIENTO ---
-MODEL_NAME = 'ANN'
+MODEL_NAME = 'DNN'
 TEST_SIZE = 0.2  # Proporción para el conjunto de prueba.
 VALIDATION_SIZE = 0.2  # Proporción del set de entrenamiento para validación.
 EPOCHS = 300
