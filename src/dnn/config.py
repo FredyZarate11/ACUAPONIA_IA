@@ -54,7 +54,7 @@ CLEANING_BOUNDS = {
 }
 
 # --- CONFIGURACIÓN DEL MODELO Y ENTRENAMIENTO ---
-MODEL_NAME = 'DNN_Generico'
+MODEL_NAME = 'DNN'
 TEST_SIZE = 0.2  # Proporción para el conjunto de prueba.
 VALIDATION_SIZE = 0.2  # Proporción del set de entrenamiento para validación.
 EPOCHS = 300

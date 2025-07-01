@@ -1,10 +1,9 @@
+import keras
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import datetime
 import time
 import os
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-import keras
 import random
 import numpy as np
 import tensorflow as tf
@@ -80,10 +79,12 @@ def run_training():
     end_time = time.time()
     training_duration = end_time - start_time
     
+    # --- 4. GUARDAR MODELO ENTRENADO ---
     os.makedirs(os.path.dirname(MODEL_SAVE_PATH), exist_ok=True)
     model.save(MODEL_SAVE_PATH)
     print(f"Modelo guardado en: {MODEL_SAVE_PATH}")
 
+    # --- 5. EVALUACIÓN DEL MODELO ---
     print("\n--- Evaluando el Modelo en el Conjunto de Prueba ---")
     y_pred_scaled = model.predict(X_test, verbose=0) # type: ignore
     scaler_Y = processed_data['scaler_Y']
@@ -124,9 +125,9 @@ def run_training():
     print("Semilla Usada:", SEED)
     print("--- Entrenamiento finalizado. ---")
 
-def run_prediction():    
-    """Carga un modelo y realiza una predicción a futuro."""    
-    print("--- Opción seleccionada: Realizar Predicción ---")        
+def run_prediction():
+    """Carga un modelo y realiza una predicción a futuro."""
+    print("--- Opción seleccionada: Realizar Predicción ---")
     if not IS_TIME_SERIES:
         print("La predicción a futuro solo está implementada para series temporales.")
         return
@@ -146,17 +147,17 @@ def run_prediction():
 
         ultimo_dia_registrado = X_original['Dia_Cultivo'].max()
         dia_objetivo = ultimo_dia_registrado + dias_a_predecir
-        
+
         # --- Simulación de peso con regresión lineal simple ---
-        X_hist_dias = X_original[['Dia_Cultivo']].values
-        y_hist_pesos = y_original.ravel()
+        X_hist_dias = X_original[['Dia_Cultivo']]
+        y_hist_pesos = y_original
         weight_regressor = LinearRegression().fit(X_hist_dias, y_hist_pesos)
-        simulated_weight = weight_regressor.predict(np.array([[dia_objetivo]]))        
-        simulated_data_point = {'dia': dia_objetivo, 'peso': simulated_weight[0]}
+        simulated_weight = weight_regressor.predict(np.array([[dia_objetivo]]))
+        simulated_data_point = {'dia': dia_objetivo, 'peso': simulated_weight[0][0]}
         # ----------------------------------------------------
 
         future_values = {'Dia_Cultivo': dia_objetivo}
-        
+
         feature_cols_for_pred = FEATURE_COLUMNS.copy()
         if 'Dia_Cultivo' not in feature_cols_for_pred:
              feature_cols_for_pred.append('Dia_Cultivo')
@@ -164,32 +165,32 @@ def run_prediction():
         for col in feature_cols_for_pred:
             if col == 'Dia_Cultivo':
                 continue
-            
+
             if col == 'Population':
                 last_val = X_original.sort_values(by='Dia_Cultivo')[col].iloc[-1]
                 future_values[col] = last_val
                 continue
-            
-            X_hist = X_original[['Dia_Cultivo']].values
-            y_hist = X_original[col].values
+
+            X_hist = X_original[['Dia_Cultivo']]
+            y_hist = X_original[col]
             linear_model = LinearRegression().fit(X_hist, y_hist)
-            predicted_val = linear_model.predict(np.array([[dia_objetivo]]))            
+            predicted_val = linear_model.predict(np.array([[dia_objetivo]]))
             future_values[col] = predicted_val[0]
 
         future_data = pd.DataFrame([future_values])[feature_cols_for_pred]
-        
+
         print("\nDatos de entrada (proyectados) para la predicción:")
         print(future_data)
-        
+
         future_data_scaled = processed_data['scaler_X'].transform(future_data)
         predicted_weight_scaled = model.predict(future_data_scaled)
         predicted_weight_original = processed_data['scaler_Y'].inverse_transform(predicted_weight_scaled)
-        
+
         print("\n--- RESULTADO DE LA PREDICCIÓN ---")
-        print(f"El peso estimado (Regresión Lineal) para el día {dia_objetivo} es: {simulated_weight[0]:.2f} gramos.")
+        print(f"El peso estimado (Regresión Lineal) para el día {dia_objetivo} es: {simulated_weight[0][0]:.2f} gramos.")
         print(f"El peso estimado (Red Neuronal) para el día {dia_objetivo} es: {predicted_weight_original[0][0]:.2f} gramos.")
         print("------------------------------------")
-        
+
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         prediction_plot_path = os.path.join(REPORT_FOLDER, f'prediccion_{timestamp}.png')
         evaluate_prediction(processed_data, dia_objetivo, predicted_weight_original, simulated_data=simulated_data_point, save_path=prediction_plot_path)

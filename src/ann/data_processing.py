@@ -1,77 +1,78 @@
-# data_processing.py
-
 import pandas as pd
-import numpy as np
-import os
 from sklearn.preprocessing import StandardScaler
+import os
+from config import (
+    CLEANED_DATA_PATH, FEATURE_COLUMNS, TARGET_COLUMN, IS_TIME_SERIES, 
+    DATE_COLUMN, MIN_CULTIVATION_DAY
+)
 
-def process_data(file_path: str, feature_cols: list, target_col: str, date_col: str = 'Datetime', apply_cleaning=True):
+def process_data():
     """
-    Carga, limpia, procesa y escala los datos, devolviendo un diccionario 
-    con todos los componentes necesarios para el entrenamiento y la predicción.
-    Incluye un filtro para usar solo datos de la fase de crecimiento acelerado.
+    Carga datos limpios y los prepara para el entrenamiento del modelo.
+    Responsabilidades:
+    1. Cargar el dataset limpio.
+    2. Si es una serie temporal, remuestrear a frecuencia diaria y crear 'Dia_Cultivo'.
+    3. Si no, usar los datos como están.
+    4. Separar y escalar las características (X) y el objetivo (y).
     """
-    if not apply_cleaning:
-        print("Cargando datos crudos sin limpieza.")
-        return pd.read_csv(file_path)
+    print(f"--- Iniciando procesamiento de datos desde: {CLEANED_DATA_PATH} ---")
 
-    print(f"--- Iniciando preprocesamiento para {os.path.basename(file_path)} ---")
-    
     try:
-        data = pd.read_csv(file_path)
+        data = pd.read_csv(CLEANED_DATA_PATH)
     except FileNotFoundError:
-        raise FileNotFoundError(f"Error: No se encontró el archivo en la ruta: {file_path}")
+        raise FileNotFoundError(f"Error: No se encontró el archivo en: {CLEANED_DATA_PATH}")
 
-    if 'created_at' in data.columns and date_col not in data.columns:
-        data = data.rename(columns={'created_at': date_col})
+    # Copia de las columnas de características para poder modificarla si es necesario
+    final_feature_cols = FEATURE_COLUMNS.copy()
 
-    data[date_col] = pd.to_datetime(data[date_col], utc=True, errors='coerce')
-    data.dropna(subset=[date_col], inplace=True)
-    
-    all_cols = feature_cols + [target_col]
-    numeric_cols = [col for col in all_cols if col in data.columns]
-    
-    for col in numeric_cols:
-        data[col] = pd.to_numeric(data[col], errors='coerce')
-        data[col].replace([np.inf, -np.inf], np.nan, inplace=True)
-        if data[col].isnull().any():
-            median_value = data[col].median()
-            data[col].fillna(median_value, inplace=True)
+    if IS_TIME_SERIES:
+        print("Procesando como Serie Temporal...")
+        data[DATE_COLUMN] = pd.to_datetime(data[DATE_COLUMN], utc=True)
+        data = data.set_index(DATE_COLUMN)
+        
+        all_cols = final_feature_cols + [TARGET_COLUMN]
+        numeric_cols = [col for col in all_cols if col in data.columns and pd.api.types.is_numeric_dtype(data[col])]
+        
+        df_daily = data[numeric_cols].resample('D').mean().dropna(how='all')
+        
+        df_daily = df_daily.reset_index()
+        start_date = df_daily[DATE_COLUMN].min()
+        df_daily['Dia_Cultivo'] = (df_daily[DATE_COLUMN] - start_date).dt.days
+        
+        # Añadir 'Dia_Cultivo' a las características si no está ya
+        if 'Dia_Cultivo' not in final_feature_cols:
+            final_feature_cols.append('Dia_Cultivo')
+
+        df_daily = df_daily.ffill().dropna()
+        print(f"Dataset agregado por día. Forma inicial: {df_daily.shape}")
+
+        if MIN_CULTIVATION_DAY and MIN_CULTIVATION_DAY > 0:
+            df_daily = df_daily[df_daily['Dia_Cultivo'] >= MIN_CULTIVATION_DAY]
+            print(f"Forma del dataset tras filtrar por día de cultivo: {df_daily.shape}")
             
-    data.dropna(subset=numeric_cols, inplace=True)
-    data = data.set_index(date_col)
-    df_daily = data[numeric_cols].resample('D').mean().dropna()
+        if df_daily.empty:
+            raise ValueError("El filtrado resultó en un DataFrame vacío.")
+        
+        processed_df = df_daily
 
-    df_daily = df_daily.reset_index()
-    start_date = df_daily[date_col].min()
-    df_daily['Dia_Cultivo'] = (df_daily[date_col] - start_date).dt.days
+    else:
+        print("Procesando como dataset tabular estándar.")
+        processed_df = data.dropna()
 
-    print(f"--- Preprocesamiento completado. ---")
+    # Asegurarse de que todas las columnas necesarias existen
+    missing_cols = [col for col in final_feature_cols + [TARGET_COLUMN] if col not in processed_df.columns]
+    if missing_cols:
+        raise ValueError(f"Las siguientes columnas no se encontraron en el dataset: {missing_cols}")
 
-    # --- Parte 2: Filtrado de Datos por Día de Cultivo ---
-    print(f"Forma del dataset antes de filtrar: {df_daily.shape}")
-    
-    print(f"Forma del dataset después de filtrar (Día > 75): {df_daily.shape}")
-    
-    if df_daily.empty:
-        raise ValueError("El filtrado ha resultado en un DataFrame vacío. Ajusta el valor del filtro o revisa tus datos.")
+    X_original = processed_df[final_feature_cols]
+    y_original = processed_df[TARGET_COLUMN]
 
-    # --- Parte 3: Separación, Escalado y Empaquetado ---
-    
-    # 1. Separar características (X) y objetivo (y)
-    X_original = df_daily[feature_cols]
-    y_original = df_daily[target_col]
-
-    # 2. Escalar las características (X)
     scaler_X = StandardScaler()
     X_scaled = scaler_X.fit_transform(X_original)
 
-    # 3. Escalar el objetivo (y)
     scaler_Y = StandardScaler()
-    # Usamos .to_numpy().reshape(-1, 1) para asegurar la forma correcta para el scaler
-    y_scaled = scaler_Y.fit_transform(y_original.to_numpy().reshape(-1, 1)).flatten() 
+    y_scaled = scaler_Y.fit_transform(y_original.to_numpy().reshape(-1, 1)).flatten()
 
-    # 4. Empaquetar todo en un diccionario para devolverlo
     processed_data = {
         'X_original': X_original,
         'X_scaled': X_scaled,
@@ -80,4 +81,12 @@ def process_data(file_path: str, feature_cols: list, target_col: str, date_col: 
         'scaler_Y': scaler_Y
     }
     
+    print("--- Procesamiento de datos completado. ---")
     return processed_data
+
+if __name__ == '__main__':
+    # Permite probar el script de forma independiente
+    try:
+        process_data()
+    except (FileNotFoundError, ValueError) as e:
+        print(e)
