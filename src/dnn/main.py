@@ -36,7 +36,7 @@ def run_training():
     
     # --- 1. LIMPIEZA Y PREPROCESAMIENTO ---
     if not clean_dataset():
-        return # Detener si la limpieza falla
+        return
     
     try:
         processed_data = process_data()
@@ -127,9 +127,9 @@ def run_training():
 def run_prediction():    
     """Carga un modelo y realiza una predicción a futuro."""    
     print("--- Opción seleccionada: Realizar Predicción ---")        
-    if not IS_TIME_SERIES:
-        print("La predicción a futuro solo está implementada para series temporales.")
-        return
+    # if not IS_TIME_SERIES:
+    #     print("La predicción a futuro solo está implementada para series temporales.")
+    #     return
     try:
         model = keras.models.load_model(MODEL_SAVE_PATH)
         print(f"Modelo cargado desde {MODEL_SAVE_PATH}")

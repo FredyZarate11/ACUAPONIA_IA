@@ -2,8 +2,8 @@
 SEED = 42  # Semilla para reproducibilidad. None para aleatorio.
 
 # --- RUTAS DE ARCHIVOS ---
-RAW_DATA_PATH = './data/dnnData/data.csv'
-CLEANED_DATA_PATH = './data/dnnData/processed/data.csv'
+RAW_DATA_PATH = './data/dnnData/datos_completos.csv'
+CLEANED_DATA_PATH = './data/dnnData/processed/datos_completos.csv'
 MODEL_SAVE_PATH = './models/dnn_model.keras'
 REPORT_FOLDER = './results/dnnResults'
 
@@ -22,7 +22,7 @@ FEATURE_COLUMNS = [
     'PH',
     'Ammonia(mg/L)',
     'Nitrate(mg/L)',
-    'Population',
+    'Dia_Cultivo',
 ]
 
 # Columnas con texto que necesitan ser convertidas a números (ej: 'Bajo', 'Medio', 'Alto').
@@ -31,7 +31,7 @@ CATEGORICAL_COLUMNS = []
 
 # --- CONFIGURACIÓN DE PROCESAMIENTO ---
 # ¿Es tu dataset una serie temporal con una columna de fecha?
-IS_TIME_SERIES = True
+IS_TIME_SERIES = False
 # Si es True, especifica el nombre de la columna de fecha.
 DATE_COLUMN = 'Datetime'
 # Día de cultivo mínimo para filtrar los datos (si es una serie temporal).
